@@ -1,0 +1,1 @@
+module.exports = require("./space_invitation.route");
