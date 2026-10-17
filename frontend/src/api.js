@@ -1,4 +1,7 @@
-const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:3000/api").replace(/\/+$/, "");
+// const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:3000/api").replace(/\/+$/, "");
+const rawApiUrl = (import.meta.env.VITE_API_URL || "http://localhost:3000/api").replace(/\/+$/, "");
+const API_BASE = rawApiUrl.endsWith("/api") ? rawApiUrl : `${rawApiUrl}/api`;
+
 
 const getHeaders = (isFormData = false) => {
   const token = localStorage.getItem("token");
