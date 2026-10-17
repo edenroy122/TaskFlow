@@ -32,6 +32,17 @@ const documentSchema = new mongoose.Schema(
             default: 0
         },
 
+        fileUrl: {
+            type: String,
+            default: ""
+        },
+
+        storageProvider: {
+            type: String,
+            enum: ["local", "supabase"],
+            default: "supabase"
+        },
+
         uploadedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "User",

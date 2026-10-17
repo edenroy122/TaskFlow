@@ -1,6 +1,5 @@
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
 
 const ALLOWED_EXTENSIONS = [
     ".pdf", ".doc", ".docx", ".xls", ".xlsx",
@@ -21,24 +20,6 @@ const ALLOWED_MIME_TYPES = [
     "application/x-zip-compressed"
 ];
 
-const createStorage = (subDir) => {
-    return multer.diskStorage({
-        destination: (req, file, cb) => {
-            const uploadPath = path.join(process.cwd(), "uploads", subDir);
-            if (!fs.existsSync(uploadPath)) {
-                fs.mkdirSync(uploadPath, { recursive: true });
-            }
-            cb(null, uploadPath);
-        },
-
-        filename: (req, file, cb) => {
-            const ext = path.extname(file.originalname).toLowerCase();
-            const safeName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-            cb(null, safeName);
-        }
-    });
-};
-
 const fileFilter = (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
 
@@ -49,14 +30,17 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
+// Memory storage for cloud uploads (Supabase)
+const memoryStorage = multer.memoryStorage();
+
 const projectUpload = multer({
-    storage: createStorage("projects"),
+    storage: memoryStorage,
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
     fileFilter
 });
 
 const taskUpload = multer({
-    storage: createStorage("tasks"),
+    storage: memoryStorage,
     limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
     fileFilter
 });

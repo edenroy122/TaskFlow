@@ -4,8 +4,11 @@ const Task = require("../models/task.model");
 const WorkspaceMember = require("../models/workspacemember.model");
 const createActivity = require("../utils/createActivity");
 const createNotification = require("../utils/createNotification");
-const path = require("path");
-const fs = require("fs");
+const {
+    uploadAttachment,
+    deleteAttachment,
+    getAttachmentDownloadTarget
+} = require("../utils/supabaseStorage");
 
 const getSpaceMember = async (spaceId, userId) => {
     return await WorkspaceMember.findOne({
@@ -28,7 +31,6 @@ const uploadProjectDocument = async (req, res) => {
         }
 
         if (project.isArchived) {
-            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             return res.status(400).json({ message: "Cannot upload documents to an archived project" });
         }
 
@@ -36,17 +38,26 @@ const uploadProjectDocument = async (req, res) => {
         const workspaceMember = await getSpaceMember(spaceId, req.user.id);
 
         if (!workspaceMember) {
-            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             return res.status(403).json({ message: "Not a space member" });
         }
 
+        // Upload to Supabase cloud storage (with local fallback if unconfigured)
+        const uploaded = await uploadAttachment({
+            buffer: req.file.buffer,
+            originalName: req.file.originalname,
+            mimeType: req.file.mimetype,
+            folder: `projects/${projectId}`
+        });
+
         const doc = await Document.create({
             name: req.body.name || req.file.originalname,
-            originalName: req.file.originalname,
-            fileName: req.file.filename,
-            filePath: req.file.path,
-            fileType: req.file.mimetype,
-            fileSize: req.file.size,
+            originalName: uploaded.originalName,
+            fileName: uploaded.fileName,
+            filePath: uploaded.filePath,
+            fileUrl: uploaded.fileUrl,
+            fileType: uploaded.fileType,
+            fileSize: uploaded.fileSize,
+            storageProvider: uploaded.storageProvider,
             uploadedBy: req.user.id,
             project: projectId
         });
@@ -80,8 +91,8 @@ const uploadProjectDocument = async (req, res) => {
             data: populatedDoc
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error" });
+        console.error("uploadProjectDocument error:", error);
+        res.status(500).json({ message: error.message || "Server error" });
     }
 };
 
@@ -104,7 +115,6 @@ const uploadTaskDocument = async (req, res) => {
         }
 
         if (project.isArchived) {
-            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             return res.status(400).json({ message: "Cannot upload documents to an archived project" });
         }
 
@@ -112,17 +122,26 @@ const uploadTaskDocument = async (req, res) => {
         const workspaceMember = await getSpaceMember(spaceId, req.user.id);
 
         if (!workspaceMember) {
-            if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
             return res.status(403).json({ message: "Not a space member" });
         }
 
+        // Upload to Supabase cloud storage (with local fallback if unconfigured)
+        const uploaded = await uploadAttachment({
+            buffer: req.file.buffer,
+            originalName: req.file.originalname,
+            mimeType: req.file.mimetype,
+            folder: `tasks/${taskId}`
+        });
+
         const doc = await Document.create({
             name: req.body.name || req.file.originalname,
-            originalName: req.file.originalname,
-            fileName: req.file.filename,
-            filePath: req.file.path,
-            fileType: req.file.mimetype,
-            fileSize: req.file.size,
+            originalName: uploaded.originalName,
+            fileName: uploaded.fileName,
+            filePath: uploaded.filePath,
+            fileUrl: uploaded.fileUrl,
+            fileType: uploaded.fileType,
+            fileSize: uploaded.fileSize,
+            storageProvider: uploaded.storageProvider,
             uploadedBy: req.user.id,
             project: project._id,
             task: taskId
@@ -143,15 +162,21 @@ const uploadTaskDocument = async (req, res) => {
         });
 
         // Notify Assignee & Manager
-        if (task.assignedTo) {
-            await createNotification({
-                recipient: task.assignedTo,
-                sender: req.user.id,
-                type: "DOCUMENT_UPLOADED",
-                message: `New document "${doc.originalName}" uploaded to task "${task.title}"`,
-                project: project._id,
-                task: taskId
-            });
+        if (task.assignedTo && task.assignedTo.length > 0) {
+            const assignees = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
+            for (const assignee of assignees) {
+                const assigneeId = assignee._id ? assignee._id.toString() : assignee.toString();
+                if (assigneeId !== req.user.id) {
+                    await createNotification({
+                        recipient: assigneeId,
+                        sender: req.user.id,
+                        type: "DOCUMENT_UPLOADED",
+                        message: `New document "${doc.originalName}" uploaded to task "${task.title}"`,
+                        project: project._id,
+                        task: taskId
+                    });
+                }
+            }
         }
 
         res.status(201).json({
@@ -159,8 +184,8 @@ const uploadTaskDocument = async (req, res) => {
             data: populatedDoc
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Server error" });
+        console.error("uploadTaskDocument error:", error);
+        res.status(500).json({ message: error.message || "Server error" });
     }
 };
 
@@ -250,14 +275,27 @@ const downloadDocument = async (req, res) => {
             return res.status(403).json({ message: "You are not authorized to access files in this space" });
         }
 
-        const resolvedPath = path.resolve(doc.filePath);
-        if (!fs.existsSync(resolvedPath)) {
-            return res.status(404).json({ message: "File missing on server storage" });
+        const target = await getAttachmentDownloadTarget({
+            filePath: doc.filePath,
+            originalName: doc.originalName,
+            storageProvider: doc.storageProvider
+        });
+
+        if (!target) {
+            return res.status(404).json({ message: "File missing on storage" });
         }
 
-        res.download(resolvedPath, doc.originalName);
+        if (target.type === "redirect") {
+            return res.redirect(target.url);
+        }
+
+        if (target.type === "file") {
+            return res.download(target.path, doc.originalName);
+        }
+
+        return res.status(404).json({ message: "File missing on storage" });
     } catch (error) {
-        console.error(error);
+        console.error("downloadDocument error:", error);
         res.status(500).json({ message: "Server error" });
     }
 };
@@ -287,13 +325,11 @@ const deleteDocument = async (req, res) => {
             return res.status(403).json({ message: "Permission denied to delete this document" });
         }
 
-        if (doc.filePath && fs.existsSync(doc.filePath)) {
-            try {
-                fs.unlinkSync(doc.filePath);
-            } catch (fsErr) {
-                console.error("Failed to delete physical file:", fsErr);
-            }
-        }
+        // Delete from storage (Supabase or local)
+        await deleteAttachment({
+            filePath: doc.filePath,
+            storageProvider: doc.storageProvider
+        });
 
         await Document.deleteOne({ _id: documentId });
 
@@ -307,7 +343,7 @@ const deleteDocument = async (req, res) => {
 
         res.status(200).json({ message: "Document deleted successfully" });
     } catch (error) {
-        console.error(error);
+        console.error("deleteDocument error:", error);
         res.status(500).json({ message: "Server error" });
     }
 };
