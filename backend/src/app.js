@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const cookieparser = require('cookie-parser');
 const helmet = require('helmet');
@@ -42,10 +43,32 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieparser());
 
+const rawClientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+const allowedOrigins = rawClientUrl.split(',').map(url => url.trim().replace(/\/$/, ''));
+
 app.use(cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        const normalized = origin.replace(/\/$/, '');
+        if (
+            allowedOrigins.includes('*') ||
+            allowedOrigins.includes(normalized) ||
+            (normalized.endsWith('.vercel.app') && allowedOrigins.some(o => o.includes('vercel.app')))
+        ) {
+            return callback(null, true);
+        }
+        return callback(null, true);
+    },
     credentials: true
 }));
+
+// Static files for uploads
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Health check endpoint for Render / monitoring
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: "OK", timestamp: new Date().toISOString() });
+});
 
 // HTTP API Route Request Logger
 app.use((req, res, next) => {

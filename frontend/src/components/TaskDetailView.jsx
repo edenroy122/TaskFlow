@@ -567,11 +567,11 @@ export function TaskDetailView({
                 ✎ Edit Task
               </button>
             )}
-            {canManageTask && (
+            {/* {canManageTask && (
               <button className="btn-secondary btn-sm text-danger" onClick={handleDelete}>
                 <IconTrash size={14} /> Delete Task
               </button>
-            )}
+            )} */}
           </div>
         </div>
 
@@ -1037,7 +1037,7 @@ export function TaskDetailView({
                       className="btn-primary btn-sm flex items-center gap-1 margin-left-2"
                       onClick={handleOpenCreateSubtaskModal}
                     >
-                      <IconPlus size={15} /> + Create Subtask
+                      <IconPlus size={15} /> Create Subtask
                     </button>
                   )}
                 </div>
@@ -1100,7 +1100,7 @@ export function TaskDetailView({
                       className="btn-primary margin-top-2"
                       onClick={handleOpenCreateSubtaskModal}
                     >
-                      <IconPlus size={16} /> + Create Subtask
+                      <IconPlus size={16} /> Create Subtask
                     </button>
                   )}
                   {formData.subtasks?.length > 0 && (

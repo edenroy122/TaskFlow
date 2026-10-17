@@ -116,7 +116,7 @@ export function WatcherPortal({ user, onLogout, workspaces = [], currentWorkspac
               </div>
               <div className="truncate">
                 <h3 className="ws-title truncate">{currentWorkspaceItem?.space?.name || currentWorkspaceItem?.workspace?.name || "Space"}</h3>
-                <span className="badge badge-accent">Watcher</span>
+                <span className="badge badge-accent">StakeHolder</span>
               </div>
             </div>
           </div>

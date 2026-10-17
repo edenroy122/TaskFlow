@@ -69,7 +69,7 @@ export function AllProjectsView({
           <input
             type="text"
             className="form-control"
-            placeholder="Search projects by name, description, manager..."
+            placeholder="Search projects by name, description..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />

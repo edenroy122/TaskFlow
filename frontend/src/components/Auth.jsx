@@ -74,7 +74,7 @@ export const Auth = ({ onLoginSuccess }) => {
           <div className="auth-logo">
             <IconSparkles size={24} />
           </div>
-          <h1 className="auth-title">Project Management System</h1>
+          <h1 className="auth-title">Task Flow</h1>
           <p className="auth-subtitle">Enterprise team collaboration suite</p>
         </div>
 
